@@ -13,7 +13,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Настройки для подключения к MongoDB
-MONGO_URL = os.getenv("MONGO_URL", "mongodb+srv://maksatkarzhaubaev91_db_user:T4mCjrXJv0lHMyGU@cluster0.xuolghj.mongodb.net/?appName=Cluster0")
+MONGO_URL = os.getenv("MONGO_URL", "mongodb+srv://maksatkarzhaubaev91_db_user:T4mCjrXJv0lHMyGU@cluster0.hjtmvk1.mongodb.net/?appName=Cluster0")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "intelligent_learning_assistant")
 ADMIN_GROUP_ID = -4837118350  # замените на свой chat_id группы
 ADMIN_IDS = [1046704546, 5420897726, 1044841557, 965417533]
