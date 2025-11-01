@@ -1,7 +1,7 @@
 import google.generativeai as genai
 import json
 import logging
-from .. import config
+import config
 
 # Конфигурируем API ключ при запуске
 try:
