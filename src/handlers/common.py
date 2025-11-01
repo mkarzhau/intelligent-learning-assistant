@@ -1,4 +1,3 @@
-from email.mime import message
 import io
 import logging
 import datetime
@@ -16,14 +15,13 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from bson import ObjectId
 import csv
-from ..config import ADMIN_IDS
-from ..config import ADMIN_GROUP_ID
-from ..services import quiz_service
+from config import ADMIN_IDS
+from config import ADMIN_GROUP_ID
+from services import quiz_service
 from zoneinfo import ZoneInfo
 from aiogram.types import BufferedInputFile
 import time
 import pandas as pd
-import io
 import matplotlib.pyplot as plt
 
 async def is_admin(user_id, db):
