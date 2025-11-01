@@ -32,7 +32,7 @@ intelligent-learning-assistant
 
 1. Clone the repository:
    ```
-   git clone <repository-url>
+   git clone git@github.com:mkarzhau/intelligent-learning-assistant.git
    cd intelligent-learning-assistant
    ```
 
@@ -55,6 +55,21 @@ intelligent-learning-assistant
    - `/add_course <course_name>`: Add a new course to your study plan.
    - `/quiz`: Generate a quiz based on your study materials.
    - `/schedule`: View and manage your study schedule.
+
+## Deployment on Railway
+
+To run your bot 24/7 on Railway:
+
+1. Push your project to GitHub.
+2. Create a new project on [Railway](https://railway.app/), and link your GitHub repository.
+3. Add a file named `Procfile` in the root of your project with the following content:
+    ```
+    python src/bot.py
+    ```
+4. Set up your environment variables (API keys, database connection) in Railway's dashboard.
+5. Deploy your project.
+
+Railway will automatically run your bot using the command from the `Procfile`.
 
 ## Contributing
 
