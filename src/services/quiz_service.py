@@ -7,7 +7,7 @@ import config
 try:
     genai.configure(api_key=config.GOOGLE_API_KEY)
 except Exception as e:
-    logging.error(f"Ошибка конфигурации Google Gemini API: {e}")
+    logging.error(f"Google Gemini API Configuration Error: {e}")
     raise
 
 # Модель для учебных материалов (квизы, конспекты)
@@ -51,7 +51,7 @@ async def generate_quiz_from_text(text_block: str) -> dict | None:
         quiz_data = json.loads(response.text)
         return quiz_data
     except Exception as e:
-        logging.error(f"Ошибка при генерации квиза с помощью Gemini: {e}")
+        logging.error(f"Error when generating a quiz using Gemini:{e}")
         return None
 
 async def get_generic_answer(question: str) -> str | None:
@@ -60,20 +60,20 @@ async def get_generic_answer(question: str) -> str | None:
     """
     try:
         prompt = (
-            "Ты — дружелюбный и умный помощник для студентов. "
-            "Отвечай КОРОТКО и по делу, максимум 5-6 предложений. "
-            "Если нужно выделить что-то, используй только HTML-теги (<b>, <i>, <u>, <code>), а не Markdown. "
-            "Не используй звёздочки или подчёркивания для выделения — только HTML. "
-            "Ответ должен быть понятным и лаконичным. "
-            "ВНИМАНИЕ: всегда отвечай на том же языке, на котором задан вопрос.\n\n"
-            f"ВОПРОС: {question}"
+            "You are a friendly and intelligent assistant for students. "
+            "Give SHORT and precise answers, with a maximum of 5–6 sentences. "
+            "If you need to highlight something, use only HTML tags (<b>, <i>, <u>, <code>) instead of Markdown. "
+            "Do not use asterisks or underscores for formatting — only HTML tags. "
+            "Your answer must be clear and concise. "
+            "IMPORTANT: Always reply in ENGLISH, no matter what language the question is asked in.\n\n"
+            f"QUESTION: {question}"
         )
         response = await qa_model.generate_content_async(prompt)
         if response.parts:
             return response.text
         else:
-            logging.warning("Gemini вернул пустой ответ на общий вопрос.")
-            return "К сожалению, я не смог найти ответ на ваш вопрос."
+            logging.warning("Gemini returned an empty answer to the general question.")
+            return "Unfortunately, I couldn't find an answer to your question."
     except Exception as e:
-        logging.error(f"Ошибка при получении ответа от Gemini: {e}")
-        return "Произошла ошибка при получении ответа."
+        logging.error(f"Error when receiving a response from Gemini: {e}")
+        return "An error occurred while receiving the response."

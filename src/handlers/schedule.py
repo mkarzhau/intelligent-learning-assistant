@@ -10,11 +10,11 @@ async def send_daily_blocks_and_reminder(bot: Bot, db: AsyncIOMotorDatabase):
     Каждый день отправляет пользователю нужное количество блоков по каждому курсу,
     чтобы успеть до экзамена, и присылает подробное напоминание.
     """
-    logging.info("Запущена ежедневная задача по отправке учебных блоков и напоминаний.")
+    logging.info("The daily task of sending training blocks and reminders has been started.")
 
     async for course in db["courses"].find({"exam_date": {"$exists": True}}):
         user_id = course["user_id"]
-        course_title = course.get("title", "Без названия")
+        course_title = course.get("title", "Untitled")
         exam_date = ensure_aware(course["exam_date"])
         expected_lectures = course.get("expected_lectures", 0)
 
@@ -33,21 +33,21 @@ async def send_daily_blocks_and_reminder(bot: Bot, db: AsyncIOMotorDatabase):
         blocks_left = len(blocks)
 
         # --- Формируем напоминание ---
-        reminder_text = f"🗓️ <b>Напоминание по курсу «{course_title}»</b>\n"
+        reminder_text = f"🗓️ <b>Course Reminder «{course_title}»</b>\n"
         if days_left < 0:
-            reminder_text += "\nЭкзамен уже прошёл! Надеюсь, всё прошло успешно. 🎉"
+            reminder_text += "\nThe exam has already passed! I hope everything went well. 🎉"
             await bot.send_message(chat_id=user_id, text=reminder_text, parse_mode="HTML")
             continue
 
         if days_left == 0:
-            reminder_text += "\n🔥 <b>Экзамен уже сегодня!</b> Удачи!\n"
+            reminder_text += "\n🔥 <b>Exam is today!</b> Good luck!\n"
         else:
-            reminder_text += f"\nДо экзамена осталось: <b>{days_left} дней</b>.\n"
+            reminder_text += f"\nDays left until the exam: <b>{days_left} days</b>.\n"
 
-        reminder_text += f"\n📚 Осталось учебных блоков: <b>{blocks_left}</b>."
-        reminder_text += f"\n📖 Загружено лекций: <b>{lectures_uploaded}</b> из {expected_lectures}."
+        reminder_text += f"\n📚 Remaining study blocks: <b>{blocks_left}</b>."
+        reminder_text += f"\n📖 Lectures uploaded: <b>{lectures_uploaded}</b> out of {expected_lectures}."
         if lectures_needed > 0:
-            reminder_text += f"\n⚠️ Не хватает лекций: <b>{lectures_needed}</b>. Загрузите их для полной подготовки!"
+            reminder_text += f"\n⚠️ Missing lectures: <b>{lectures_needed}</b>. Upload them for full preparation!"
 
         await bot.send_message(chat_id=user_id, text=reminder_text, parse_mode="HTML")
 
@@ -64,17 +64,18 @@ async def send_daily_blocks_and_reminder(bot: Bot, db: AsyncIOMotorDatabase):
             blocks_to_send = blocks[:blocks_per_day]
 
         for block in blocks_to_send:
-            summary = block.get('summary', 'Нет краткого содержания.')
-            explanation = block.get('explanation', 'Нет объяснения.')
+            summary = block.get('summary', 'No summary available.')
+            explanation = block.get('explanation', 'No explanation available.')
             text_to_send = (
-                f"🔔 <b>Новый материал для изучения!</b>\n\n"
-                f"📚 <b>Курс:</b> «{course_title}»\n\n"
-                f"<b>Краткое содержание:</b>\n<i>{summary}</i>\n\n"
-                f"<b>Простыми словами:</b>\n<i>{explanation}</i>"
+                f"🔔 <b>New study material!</b>\n\n"
+                f"📚 <b>Course:</b> «{course_title}»\n\n"
+                f"<b>Summary:</b>\n<i>{summary}</i>\n\n"
+                f"<b>In simple words:</b>\n<i>{explanation}</i>"
             )
+
             keyboard = InlineKeyboardMarkup(
                 inline_keyboard=[
-                    [InlineKeyboardButton(text="✅ Я изучил", callback_data=f"block_learned:{block['_id']}")]
+                    [InlineKeyboardButton(text="✅ I've studied", callback_data=f"block_learned:{block['_id']}")]
                 ]
             )
             try:
@@ -89,4 +90,4 @@ async def send_daily_blocks_and_reminder(bot: Bot, db: AsyncIOMotorDatabase):
                     {"$set": {"sent_at": now_utc()}}
                 )
             except Exception as e:
-                logging.error(f"Не удалось отправить блок пользователю {user_id}: {e}")
+                logging.error(f"Couldn't send the block to the user {user_id}: {e}")

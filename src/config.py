@@ -20,7 +20,7 @@ ADMIN_IDS = [1046704546, 5420897726, 1044841557, 965417533]
 # --- Проверка на наличие обязательных ключей ---
 # Если бот не сможет запуститься без этих ключей, он сразу выдаст понятную ошибку.
 if not BOT_TOKEN:
-    raise ValueError("Ошибка: BOT_TOKEN не найден. Пожалуйста, добавьте его в .env файл.")
+    raise ValueError("Error: BOT_TOKEN was not found. Please add it to the .env file.")
 
 if not GOOGLE_API_KEY:
-    raise ValueError("Ошибка: GOOGLE_API_KEY не найден. Пожалуйста, добавьте его в .env файл.")
+    raise ValueError("Error: GOOGLE_API_KEY was not found. Please add it to the .env file.")

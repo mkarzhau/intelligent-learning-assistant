@@ -61,4 +61,4 @@ if __name__ == '__main__':
     except (KeyboardInterrupt, SystemExit):
         logging.info("Bot stopped")
     except Exception as e:
-        logging.critical(f"Критическая ошибка при запуске бота: {e}")
+        logging.critical(f"Critical error when launching the bot: {e}")

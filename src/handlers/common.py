@@ -46,8 +46,8 @@ async def is_blocked(user_id, db):
 
 async def generate_daily_motivation():
     prompt = (
-        "Сгенерируй короткое мотивационное сообщение для студента, чтобы вдохновить его на учебу сегодня. "
-        "Сообщение должно быть позитивным, на русском языке, не длиннее 2-х предложений."
+        "Generate a short motivational message for a student to inspire them to study today. "
+        "The message should be positive, in English, and no longer than 2 sentences."
     )
     # Используй свой сервис для генерации текста
     motivation = await quiz_service.get_generic_answer(prompt)
@@ -138,125 +138,128 @@ class LectureQuiz(StatesGroup):
 async def set_admin(message: Message, db: AsyncIOMotorDatabase):
     parts = message.text.split(maxsplit=2)
     if not await is_admin(message.from_user.id, db):
-        await message.answer("❌ Только администраторы могут использовать эту команду.")
+        await message.answer("❌ Only administrators can use this command.")
         return
     if len(parts) < 2:
-        await message.answer("Используйте: /set_admin <user_id>")
+        await message.answer("Use: /set_admin <user_id>")
         return
     user_id = int(parts[1])
     await db["users"].update_one({"telegram_id": user_id}, {"$set": {"role": "admin"}})
     await log_admin_action(db, message.from_user.id, "set_admin", {"set_admin_id": user_id})
-    await message.answer(f"Пользователь {user_id} назначен админом.")
+    await message.answer(f"User {user_id} appointed as an administrator.")
 
 # --- Хендлеры для команды /add_course ---
 @router.message(Command("help"))
 async def help_command(message: Message, db: AsyncIOMotorDatabase):
     is_admin_user = await is_admin(message.from_user.id, db)
     text = (
-        "<b>Доступные команды:</b>\n\n"
-        "/add_course — добавить новый курс\n"
-        "/delete_course — удалить курс\n"
-        "/edit_course — изменить название курса\n"
-        "/show_courses — показать ваши курсы и статус блоков\n"
-        "/my_files — список загруженных файлов\n"
-        "/delete_file — удалить загруженный файл\n"
-        "/preview_schedule — предпросмотр расписания отправки блоков\n"
-        "/simulate_send — симуляция отправки ближайших блоков (тест)\n"
-        "/pause_notifications — отключить уведомления\n"
-        "/resume_notifications — включить уведомления\n"
-        "/search \"слово\" — поиск по материалам\n"
-        "/export — экспортировать учебные блоки (.csv)\n"
-        "/profile — ваш прогресс, очки и достижения\n"
-        "/top — рейтинг учащихся\n"
-        "/feedback — отправить отзыв\n"
-        "/start — приветствие и инструкция\n"
-        "/help — показать эту справку\n"
+        "<b>Available commands:</b>\n\n"
+        "/add_course — add a new course\n"
+        "/delete_course — delete a course\n"
+        "/edit_course — rename a course\n"
+        "/show_courses — show your courses and block statuses\n"
+        "/my_files — list of uploaded files\n"
+        "/delete_file — delete an uploaded file\n"
+        "/preview_schedule — preview the block delivery schedule\n"
+        "/simulate_send — simulate sending the next blocks (test)\n"
+        "/pause_notifications — disable notifications\n"
+        "/resume_notifications — enable notifications\n"
+        "/search \"word\" — search through materials\n"
+        "/export — export study blocks (.csv)\n"
+        "/profile — your progress, points, and achievements\n"
+        "/top — student leaderboard\n"
+        "/feedback — send feedback\n"
+        "/start — welcome message and instructions\n"
+        "/help — show this help menu\n"
     )
+
     if is_admin_user:
         text += (
-            "\n<b>Админ-команды:</b>\n"
-            "/set_admin \"User ID\" — назначить админа\n"
-            "/block_user — заблокировать пользователя\n"
-            "/admin_report — отчет по пользователям\n"
-            "/admin_load — нагрузка системы\n"
-            "/admin_message — отправить сообщение пользователю или всем\n"
-            "/unblock_user — разблокировать пользователя\n"
-            "/get_id — узнать chat_id группы\n"
+            "\n<b>Admin commands:</b>\n"
+            "/set_admin \"User ID\" — assign an admin\n"
+            "/block_user — block a user\n"
+            "/admin_report — user activity report\n"
+            "/admin_load — system load overview\n"
+            "/admin_message — send a message to a user or to everyone\n"
+            "/unblock_user — unblock a user\n"
+            "/get_id — get the group chat_id\n"
         )
+
     text += (
-        "\n<b>Геймификация и квизы:</b>\n"
-        "- После изучения всех блоков лекции появится квиз.\n"
-        "- За правильные ответы начисляются очки.\n"
-        "- За 100% правильных — бейдж «Квиз-мастер».\n"
-        "- Ваши очки и достижения — в /profile.\n"
-        "- Рейтинг — в /top.\n"
-        "- После квиза показываются ошибки и пояснения.\n"
-        "- Просто напишите вопрос — и я помогу с учебой!"
+        "\n<b>Gamification and quizzes:</b>\n"
+        "- After studying all lecture blocks, a quiz will appear.\n"
+        "- You earn points for correct answers.\n"
+        "- For 100% correct — you get the “Quiz Master” badge.\n"
+        "- Your points and achievements are in /profile.\n"
+        "- Rankings are available in /top.\n"
+        "- After the quiz, mistakes and explanations will be shown.\n"
+        "- Just type any question — and I’ll help you with your studies!"
     )
+
     await message.answer(text, parse_mode="HTML")
 
 @router.message(Command("add_course"))
 async def add_course_start(message: Message, state: FSMContext, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     course_count = await db["courses"].count_documents({"user_id": message.from_user.id})
     if course_count >= 10:
-        await message.answer("❌ Вы достигли максимального количества курсов (10). Удалите старый курс, чтобы добавить новый.")
+        await message.answer("❌ You have reached the maximum number of courses (10). Delete the old course to add a new one.")
         return
     await state.set_state(AddCourse.waiting_for_title)
-    await message.answer("Введите название нового курса (например, 'История Древнего мира').")
+    await message.answer("Enter the name of the new course (for example, 'RMT').")
 
 @router.message(Command("simulate_send"))
 async def simulate_send_start(message: Message, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     user_courses = await db["courses"].find({"user_id": message.from_user.id}).to_list(length=20)
     if not user_courses:
-        await message.answer("У вас нет добавленных курсов.")
+        await message.answer("You don't have any courses added.")
         return
     builder = InlineKeyboardBuilder()
     for course in user_courses:
         builder.add(InlineKeyboardButton(text=course['title'], callback_data=f"simulate_send:{course['_id']}"))
     builder.adjust(1)
-    await message.answer("Выберите курс для симуляции отправки (отправятся ближайшие блоки):", reply_markup=builder.as_markup())
+    await message.answer("Select a course to simulate sending (the next blocks will be sent):", reply_markup=builder.as_markup())
 
 @router.message(Command("block_user"))
 async def block_user_start(message: Message, db: AsyncIOMotorDatabase):
     if not await is_admin(message.from_user.id, db):
-        await message.answer("❌ Только администраторы могут использовать эту команду.")
+        await message.answer("❌ Only administrators can use this command.")
         return
     users = await db["users"].find({"role": {"$ne": "admin"}, "blocked": {"$ne": True}}).to_list(length=100)
     if not users:
-        await message.answer("Нет доступных пользователей для блокировки.")
+        await message.answer("There are no users available to block.")
         return
     builder = InlineKeyboardBuilder()
     for user in users:
-        name = user.get("name", "Без имени")
+        name = user.get("name", "Without a name")
         uid = user.get("telegram_id")
         builder.add(InlineKeyboardButton(
             text=f"{name} ({uid})",
             callback_data=f"block_user_select:{uid}"
         ))
     builder.adjust(1)
-    await message.answer("Выберите пользователя для блокировки:", reply_markup=builder.as_markup())
+    await message.answer("Select a user to block:", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data.startswith("block_user_select:"))
 async def block_user_confirm(callback: CallbackQuery, db: AsyncIOMotorDatabase):
     user_id = int(callback.data.split(":")[1])
     user = await db["users"].find_one({"telegram_id": user_id})
     if not user:
-        await callback.message.answer("Пользователь не найден.")
+        await callback.message.answer("The user was not found.")
         return
     builder = InlineKeyboardBuilder()
     builder.add(
-        InlineKeyboardButton(text="Да, заблокировать", callback_data=f"block_user_confirm:{user_id}"),
-        InlineKeyboardButton(text="Нет", callback_data="cancel_block_user")
+        InlineKeyboardButton(text="Yes, block it", callback_data=f"block_user_confirm:{user_id}"),
+        InlineKeyboardButton(text="No", callback_data="cancel_block_user")
     )
     await callback.message.answer(
-        f"Вы уверены, что хотите заблокировать пользователя:\n"
-        f"{user.get('name', 'Без имени')} (ID: {user_id})?",
+        f"Are you sure you want to block the user?:\n"
+        f"{user.get('name', 'Without a name')} (ID: {user_id})?",
         reply_markup=builder.as_markup()
     )
 
@@ -266,46 +269,46 @@ async def block_user_real(callback: CallbackQuery, db: AsyncIOMotorDatabase):
     await db["users"].update_one({"telegram_id": user_id}, {"$set": {"blocked": True}})
     await log_admin_action(db, callback.from_user.id, "block_user", {"blocked_id": user_id})
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer(f"Пользователь {user_id} успешно заблокирован.")
+    await callback.message.answer(f"User {user_id} successfully blocked.")
 
 @router.callback_query(F.data == "cancel_block_user")
 async def cancel_block_user(callback: CallbackQuery):
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer("Блокировка отменена.")
+    await callback.message.answer("The lock has been lifted.")
 
 @router.message(Command("feedback"))
 async def feedback_start(message: Message, state: FSMContext, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     await state.set_state("waiting_for_feedback")
-    await message.answer("Напишите ваш отзыв или предложение:")
+    await message.answer("Write your review or suggestion.:")
 
 @router.message(Command("admin_message"))
 async def admin_message_start(message: Message, db: AsyncIOMotorDatabase):
     if not await is_admin(message.from_user.id, db):
-        await message.answer("❌ Только администраторы могут использовать эту команду.")
+        await message.answer("❌ Only administrators can use this command.")
         return
     users = await db["users"].find({"blocked": {"$ne": True}}).to_list(length=100)
     builder = InlineKeyboardBuilder()
     for user in users:
-        name = user.get("name", "Без имени")
+        name = user.get("name", "Without a name")
         uid = user.get("telegram_id")
         builder.add(InlineKeyboardButton(
             text=f"{name} ({uid})",
             callback_data=f"admin_msg_select:{uid}"
         ))
     builder.add(InlineKeyboardButton(
-        text="Всем пользователям", callback_data="admin_msg_select:all"
+        text="To all users", callback_data="admin_msg_select:all"
     ))
     builder.adjust(1)
-    await message.answer("Кому отправить сообщение?", reply_markup=builder.as_markup())
+    await message.answer("Who should I send a message to?", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data.startswith("admin_msg_select:"))
 async def admin_message_text(callback: CallbackQuery, state: FSMContext):
     target = callback.data.split(":")[1]
     await state.update_data(admin_msg_target=target)
-    await callback.message.answer("Введите текст сообщения для отправки:")
+    await callback.message.answer("Enter the text of the message to send:")
     await state.set_state("waiting_for_admin_msg_text")
 
 @router.message(StateFilter("waiting_for_admin_msg_text"))
@@ -322,13 +325,13 @@ async def admin_message_send(message: Message, state: FSMContext, db: AsyncIOMot
                 count += 1
             except Exception:
                 continue
-        await message.answer(f"Сообщение отправлено {count} пользователям.")
+        await message.answer(f"The message has been sent {count} for users.")
     else:
         try:
             await bot.send_message(chat_id=int(target), text=text)
-            await message.answer("Сообщение отправлено выбранному пользователю.")
+            await message.answer("The message was sent to the selected user.")
         except Exception as e:
-            await message.answer(f"Ошибка отправки: {e}")
+            await message.answer(f"Sending error: {e}")
     await state.clear()
 
 @router.message(StateFilter("waiting_for_feedback"))
@@ -338,42 +341,43 @@ async def feedback_receive(message: Message, state: FSMContext, db: AsyncIOMotor
         "text": message.text,
         "created_at": datetime.datetime.utcnow()
     })
-    await message.answer("Спасибо за ваш отзыв!")
+    await message.answer("Thank you for your feedback!")
     await state.clear()
 
     # Отправка фидбэка в группу админов
     feedback_text = (
-        f"📩 Новый фидбэк!\n"
-        f"Имя: {message.from_user.full_name}\n"
+        f"📩 New feedback received!\n"
+        f"Name: {message.from_user.full_name}\n"
         f"Telegram ID: {message.from_user.id}\n"
-        f"Время: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
-        f"Текст: {message.text}"
+        f"Time: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"Message: {message.text}"
     )
+
     await bot.send_message(chat_id=ADMIN_GROUP_ID, text=feedback_text)
 
 @router.message(Command("export"))
 async def export_choose_course(message: Message, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     user_courses = await db["courses"].find({"user_id": message.from_user.id}).to_list(length=20)
     if not user_courses:
-        await message.answer("У вас нет добавленных курсов.")
+        await message.answer("You don't have any courses added.")
         return
     builder = InlineKeyboardBuilder()
     for course in user_courses:
         builder.add(InlineKeyboardButton(text=course['title'], callback_data=f"export_course:{course['_id']}"))
     builder.adjust(1)
-    await message.answer("Выберите курс для экспорта учебных блоков:", reply_markup=builder.as_markup())
+    await message.answer("Select a course to export training blocks to:", reply_markup=builder.as_markup())
 
 @router.message(Command("admin_logs"))
 async def admin_logs(message: Message, db: AsyncIOMotorDatabase):
     if not await is_admin(message.from_user.id, db):
-        await message.answer("❌ Только администраторы могут использовать эту команду.")
+        await message.answer("❌ Only administrators can use this command.")
         return
     logs = await db["admin_logs"].find().sort("timestamp", -1).limit(20).to_list(length=20)
     if not logs:
-        await message.answer("Лог действий админов пуст.")
+        await message.answer("The admins' action log is empty.")
         return
     lines = []
     for log in logs:
@@ -387,7 +391,7 @@ async def admin_logs(message: Message, db: AsyncIOMotorDatabase):
 @router.message(Command("admin_stats"))
 async def admin_stats(message: Message, db: AsyncIOMotorDatabase, bot: Bot):
     if not await is_admin(message.from_user.id, db):
-        await message.answer("❌ Только администраторы могут использовать эту команду.")
+        await message.answer("❌ Only administrators can use this command.")
         return
 
     # Пример: активность пользователей по дням (можно заменить на свою аналитику)
@@ -405,21 +409,21 @@ async def admin_stats(message: Message, db: AsyncIOMotorDatabase, bot: Bot):
     plt.figure(figsize=(8, 4))
     plt.bar(dates, counts)
     plt.xticks(rotation=45)
-    plt.title("Активность фидбэка пользователей по дням")
-    plt.xlabel("Дата")
-    plt.ylabel("Количество фидбэков")
+    plt.title("User feedback activity by day")
+    plt.xlabel("Date")
+    plt.ylabel("Number of feedbacks")
     plt.tight_layout()
     buf = io.BytesIO()
     plt.savefig(buf, format="png")
     buf.seek(0)
     plt.close()
 
-    await bot.send_photo(chat_id=message.chat.id, photo=buf, caption="График активности пользователей (фидбэк)")
+    await bot.send_photo(chat_id=message.chat.id, photo=buf, caption="User activity schedule (feedback)")
 
 @router.message(Command("admin_export"))
 async def admin_export(message: Message, db: AsyncIOMotorDatabase, bot: Bot):
     if not await is_admin(message.from_user.id, db):
-        await message.answer("❌ Только администраторы могут использовать эту команду.")
+        await message.answer("❌ Only administrators can use this command.")
         return
 
     # Получаем пользователей
@@ -454,18 +458,18 @@ async def admin_export(message: Message, db: AsyncIOMotorDatabase, bot: Bot):
     await bot.send_document(
         chat_id=message.chat.id,
         document=types.input_file.InputFile(io.BytesIO(output.getvalue().encode()), filename="user_statistics.csv"),
-        caption="Экспорт статистики пользователей"
+        caption="Exporting user statistics"
     )
 
 @router.callback_query(F.data.startswith("export_course:"))
 async def export_blocks_for_course(callback: CallbackQuery, db: AsyncIOMotorDatabase):
     if await is_blocked(callback.from_user.id, db):
-        await callback.message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await callback.message.answer("❌ Your account has been blocked by the administrator.")
         return
     course_id = ObjectId(callback.data.split(":")[1])
     blocks = await db["blocks"].find({"course_id": course_id, "user_id": callback.from_user.id}).to_list(length=100)
     if not blocks:
-        await callback.message.answer("Нет блоков для этого курса.")
+        await callback.message.answer("There are no blocks for this course.")
         return
     output = io.StringIO()
     writer = csv.writer(output, delimiter=';')
@@ -485,27 +489,27 @@ async def export_blocks_for_course(callback: CallbackQuery, db: AsyncIOMotorData
 async def add_course_date(message: Message, state: FSMContext):
     exam_dt = parse_date(message.text)
     if not exam_dt:
-        await message.answer("❌ Неверный формат даты. Пожалуйста, введите дату в формате ДД.MM.ГГГГ.")
+        await message.answer("❌ Incorrect date format. Please enter the date in the format DD.MM.YYYY.")
         return
 
     if exam_dt.year != 2025:
-        await message.answer("❌ Экзамен должен быть в 2025 году. Введите корректную дату.")
+        await message.answer("❌ The exam is due in 2025. Enter the correct date.")
         return
 
     now = now_local()
     if exam_dt < now:
-        await message.answer("❌ Дата экзамена уже прошла. Введите будущую дату экзамена.")
+        await message.answer("❌ The exam date has already passed. Enter a future exam date.")
         return
 
     data = await state.get_data()
     start_dt = data.get("start_date")
     if not start_dt:
-        await message.answer("❌ Внутренняя ошибка: не найдена дата начала. Пожалуйста, начните /add_course заново.")
+        await message.answer("❌ Internal error: the start date was not found. Please start /add_course again.")
         await state.clear()
         return
 
     if exam_dt < start_dt:
-        await message.answer("❌ Дата экзамена не может быть раньше даты начала занятий. Введите корректную дату экзамена.")
+        await message.answer("❌ The exam date cannot be earlier than the start date of classes. Enter the correct exam date.")
         return
 
     # Сохраняем дату экзамена
@@ -514,16 +518,17 @@ async def add_course_date(message: Message, state: FSMContext):
     # Информируем пользователя о текущей академической неделе и фазах
     info = exam_phase_info(start_dt, now_local())
     week = info["current_week"]
-    passed = ", ".join(info["passed"]) if info["passed"] else "ничего"
-    upcoming = ", ".join(info["upcoming"]) if info["upcoming"] else "ничего"
+    passed = ", ".join(info["passed"]) if info["passed"] else "nothing"
+    upcoming = ", ".join(info["upcoming"]) if info["upcoming"] else "nothing"
     await message.answer(
-        f"Дата экзамена принята.\n"
-        f"С начала занятий прошло: <b>{week}</b> нед(и).\n"
-        f"Пройдено: {passed}.\n"
-        f"Скоро: {upcoming}.\n\n"
-        "Далее укажите, сколько всего лекций планируется в курсе (целое число)."
-        , parse_mode="HTML"
+        f"Exam date saved.\n"
+        f"Time since the start of classes: <b>{week}</b> week(s).\n"
+        f"Completed: {passed}.\n"
+        f"Upcoming: {upcoming}.\n\n"
+        "Next, please specify how many total lectures are planned for this course (an integer).",
+        parse_mode="HTML"
     )
+
 
     await state.set_state(AddCourse.waiting_for_lecture_count)
     
@@ -532,7 +537,7 @@ async def add_course_date(message: Message, state: FSMContext):
 @router.message(AddCourse.waiting_for_lecture_count)
 async def add_course_lectures(message: Message, state: FSMContext):
     if not message.text.isdigit():
-        await message.answer("❌ Пожалуйста, введите число.")
+        await message.answer("❌ Please enter the number.")
         return
 
     num = int(message.text)
@@ -540,14 +545,15 @@ async def add_course_lectures(message: Message, state: FSMContext):
     exam_dt = data.get("exam_date")
     start_dt = data.get("start_date")
     # Рекомендации: mid/end/final
-    rec = "Рекомендация: для mid/end обычно 5 лекций, для final — 10 (включая предыдущие)."
+    rec = "Recommendation: for mid/end exams usually 5 lectures, for final — 10 (including previous ones)."
     await state.update_data(expected_lectures=num)
     await state.set_state(AddCourse.waiting_for_notification_period)
     await message.answer(
-        f"Количество лекций сохранено: {num}.\n{rec}\n\n"
-        "В какое время суток тебе удобно получать учебные сообщения?\n"
-        "Выбери: утро, день или вечер."
+        f"Number of lectures saved: {num}.\n{rec}\n\n"
+        "What time of day is convenient for you to receive study messages?\n"
+        "Choose: morning, afternoon, or evening."
     )
+
 
 class EditCourse(StatesGroup):
     waiting_for_course_choice = State()
@@ -556,11 +562,11 @@ class EditCourse(StatesGroup):
 @router.message(Command("edit_course"))
 async def edit_course_start(message: Message, state: FSMContext, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     user_courses = await db["courses"].find({"user_id": message.from_user.id}).to_list(length=10)
     if not user_courses:
-        await message.answer("У вас нет добавленных курсов.")
+        await message.answer("You don't have any courses added.")
         return
 
     builder = InlineKeyboardBuilder()
@@ -571,17 +577,17 @@ async def edit_course_start(message: Message, state: FSMContext, db: AsyncIOMoto
         ))
     builder.adjust(1)
     await state.set_state(EditCourse.waiting_for_course_choice)
-    await message.answer("Выберите курс для изменения названия:", reply_markup=builder.as_markup())
+    await message.answer("Select a course to change the name of:", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data.startswith("edit_course:"), EditCourse.waiting_for_course_choice)
 async def edit_course_choose(callback: CallbackQuery, state: FSMContext, db: AsyncIOMotorDatabase):
     if await is_blocked(callback.from_user.id, db):
-        await callback.message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await callback.answer("❌ Your account has been blocked by the administrator.")
         return
     course_id = callback.data.split(":")[1]
     await state.update_data(course_id=course_id)
     await state.set_state(EditCourse.waiting_for_new_title)
-    await callback.message.answer("Введите новое название курса:")
+    await callback.message.answer("Enter a new course name:")
 
 @router.message(EditCourse.waiting_for_new_title)
 async def edit_course_title(message: Message, state: FSMContext, db: AsyncIOMotorDatabase):
@@ -589,17 +595,17 @@ async def edit_course_title(message: Message, state: FSMContext, db: AsyncIOMoto
     course_id = ObjectId(data["course_id"])
     new_title = message.text.strip()
     await db["courses"].update_one({"_id": course_id}, {"$set": {"title": new_title}})
-    await message.answer(f"Название курса успешно обновлено на «{new_title}».")
+    await message.answer(f"The course name has been successfully updated to «{new_title}».")
     await state.clear()
 
 @router.message(Command("my_files"))
 async def choose_course_for_files(message: Message, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     user_courses = await db["courses"].find({"user_id": message.from_user.id}).to_list(length=20)
     if not user_courses:
-        await message.answer("У вас нет добавленных курсов.")
+        await message.answer("You don't have any courses added.")
         return
 
     builder = InlineKeyboardBuilder()
@@ -609,16 +615,16 @@ async def choose_course_for_files(message: Message, db: AsyncIOMotorDatabase):
             callback_data=f"show_files:{course['_id']}"
         ))
     builder.adjust(1)
-    await message.answer("Выберите курс для просмотра файлов:", reply_markup=builder.as_markup())
+    await message.answer("Select a course to view the files:", reply_markup=builder.as_markup())
     
 @router.message(Command("delete_file"))
 async def delete_file_start(message: Message, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     lectures = await db["lectures"].find({"user_id": message.from_user.id}).to_list(length=20)
     if not lectures:
-        await message.answer("Вы не загружали ни одного файла.")
+        await message.answer("You haven't uploaded any files.")
         return
     builder = InlineKeyboardBuilder()
     for lec in lectures:
@@ -627,25 +633,25 @@ async def delete_file_start(message: Message, db: AsyncIOMotorDatabase):
             callback_data=f"delete_file:{lec['_id']}"
         ))
     builder.adjust(1)
-    await message.answer("Выберите файл для удаления:", reply_markup=builder.as_markup())
+    await message.answer("Select the file to delete:", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data.startswith("delete_file:"))
 async def confirm_delete_file(callback: CallbackQuery, db: AsyncIOMotorDatabase):
     if await is_blocked(callback.from_user.id, db):
-        await callback.message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await callback.answer("❌ Your account has been blocked by the administrator.")
         return
     file_id = ObjectId(callback.data.split(":")[1])
     file = await db["lectures"].find_one({"_id": file_id})
     if not file:
-        await callback.message.answer("Файл не найден.")
+        await callback.message.answer("The file was not found.")
         return
     builder = InlineKeyboardBuilder()
     builder.add(
-        InlineKeyboardButton(text="Да, удалить", callback_data=f"confirm_delete_file:{file_id}"),
-        InlineKeyboardButton(text="Нет", callback_data="cancel_delete_file")
+        InlineKeyboardButton(text="Yes, delete it", callback_data=f"confirm_delete_file:{file_id}"),
+        InlineKeyboardButton(text="No", callback_data="cancel_delete_file")
     )
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer(f"Вы уверены, что хотите удалить файл «{file['filename']}»?", reply_markup=builder.as_markup())
+    await callback.message.answer(f"Are you sure you want to delete the file «{file['filename']}»?", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data.startswith("confirm_delete_file:"))
 async def really_delete_file(callback: CallbackQuery, db: AsyncIOMotorDatabase):
@@ -654,34 +660,34 @@ async def really_delete_file(callback: CallbackQuery, db: AsyncIOMotorDatabase):
     await db["lectures"].delete_one({"_id": file_id})
     await db["blocks"].delete_many({"lecture_id": file_id})
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer(f"Файл «{file['filename']}» и связанные учебные блоки удалены.")
+    await callback.message.answer(f"File «{file['filename']}» and the related training blocks have been deleted.")
 
 @router.callback_query(F.data == "cancel_delete_file")
 async def cancel_delete_file(callback: CallbackQuery):
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer("Удаление файла отменено.")
+    await callback.message.answer("File deletion has been canceled.")
 
 @router.message(Command("search"))
 async def search_blocks(message: Message, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     query = message.text.replace("/search", "").strip()
     if not query:
-        await message.answer("Введите ключевое слово для поиска после /search.")
+        await message.answer("Enter the search keyword after /search.")
         return
     results = await db["blocks"].find({"$text": {"$search": query}, "user_id": message.from_user.id}).to_list(length=10)
     if not results:
-        await message.answer("Ничего не найдено.")
+        await message.answer("Nothing was found.")
         return
     for block in results:
-        await message.answer(f"Найдено:\n{block.get('summary', '')}\n{block.get('explanation', '')}")
+        await message.answer(f"Found:\n{block.get('summary', '')}\n{block.get('explanation', '')}")
 
 @router.message(AddCourse.waiting_for_notification_period)
 async def add_course_notification_period(message: Message, state: FSMContext, db: AsyncIOMotorDatabase):
     period = message.text.strip().lower()
-    if period not in ["утро", "день", "вечер"]:
-        await message.answer("❌ Введи только: утро, день или вечер.")
+    if period not in ["morning", "afternoon", "evening"]:
+        await message.answer("❌ Just enter: morning, afternoon, or evening.")
         return
 
     user_data = await state.get_data()
@@ -702,9 +708,10 @@ async def add_course_notification_period(message: Message, state: FSMContext, db
         "created_at": datetime.datetime.utcnow()
     })
     await message.answer(
-        f"✅ Курс «{user_data['title']}» успешно добавлен!\n\n"
-        "Теперь вы будете получать учебные сообщения в выбранный период суток."
+        f"✅ Course «{user_data['title']}» has been successfully added!\n\n"
+        "You will now receive study messages during the selected time of day."
     )
+
     await state.clear()
 
 # --- Хендлеры для "Умной загрузки" файлов ---
@@ -712,12 +719,12 @@ async def add_course_notification_period(message: Message, state: FSMContext, db
 @router.message(F.document)
 async def handle_document_start(message: Message, state: FSMContext, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     user_courses = await db["courses"].find({"user_id": message.from_user.id}).to_list(length=10)
 
     if not user_courses:
-        await message.answer("❌ Вы еще не добавили ни одного курса. Сначала добавьте курс с помощью /add_course.")
+        await message.answer("❌ You haven't added any courses yet. First, add a course using /add_course.")
         return
 
     await state.update_data(
@@ -734,45 +741,46 @@ async def handle_document_start(message: Message, state: FSMContext, db: AsyncIO
     builder.adjust(1)
 
     await state.set_state(FileUpload.waiting_for_course_choice)
-    await message.answer("К какому курсу относится этот файл?", reply_markup=builder.as_markup())
+    await message.answer("Which course does this file belong to?", reply_markup=builder.as_markup())
 
 
     
 @router.message(Command("profile"))
 async def show_profile(message: Message, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     user = await db["users"].find_one({"telegram_id": message.from_user.id})
     score = user.get("score", 0) if user else 0
     badges = user.get("badges", []) if user else []
     text = (
-        f"👤 <b>Профиль</b>\n"
-        f"Очки: <b>{score}</b>\n"
-        f"Достижения: {', '.join(badges) if badges else 'Пока нет'}"
+        f"👤 <b>Profile</b>\n"
+        f"Points: <b>{score}</b>\n"
+        f"Achievements: {', '.join(badges) if badges else 'None yet'}"
     )
+
     await message.answer(text, parse_mode="HTML")    
 
 @router.message(Command("top"))
 async def show_top_users(message: Message, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     top_users = await db["users"].find().sort("score", -1).limit(10).to_list(length=10)
     if not top_users:
-        await message.answer("Таблица лидеров пуста.")
+        await message.answer("The leaderboard is empty.")
         return
     lines = []
     for idx, user in enumerate(top_users, start=1):
-        name = user.get("name", "Без имени")
+        name = user.get("name", "Without a name")
         score = user.get("score", 0)
-        lines.append(f"{idx}. {name} — {score} очков")
-    await message.answer("<b>🏆 Топ-10 учащихся:</b>\n" + "\n".join(lines), parse_mode="HTML")
+        lines.append(f"{idx}. {name} — {score} points")
+    await message.answer("<b>🏆 Top 10 students:</b>\n" + "\n".join(lines), parse_mode="HTML")
  
 @router.message(Command("admin_report"))
 async def admin_report(message: Message, db: AsyncIOMotorDatabase):
     if not await is_admin(message.from_user.id, db):
-        await message.answer("❌ Только администраторы могут использовать эту команду.")
+        await message.answer("❌ Only administrators can use this command.")
         return
     users = await db["users"].find().to_list(length=100)
     report = []
@@ -780,13 +788,13 @@ async def admin_report(message: Message, db: AsyncIOMotorDatabase):
         courses = await db["courses"].count_documents({"user_id": user["telegram_id"]})
         files = await db["lectures"].count_documents({"user_id": user["telegram_id"]})
         score = user.get("score", 0)
-        report.append(f"{user.get('name', 'Без имени')} (ID: {user['telegram_id']}): курсов={courses}, файлов={files}, очки={score}")
+        report.append(f"{user.get('name', 'Without a name')} (ID: {user['telegram_id']}): courses={courses}, files={files}, points={score}")
     await message.answer("\n".join(report))
 
 @router.message(Command("admin_load"))
 async def admin_load(message: Message, db: AsyncIOMotorDatabase):
     if not await is_admin(message.from_user.id, db):
-        await message.answer("❌ Только администраторы могут использовать эту команду.")
+        await message.answer("❌ Only administrators can use this command.")
         return
     users_count = await db["users"].count_documents({})
     courses_count = await db["courses"].count_documents({})
@@ -795,14 +803,15 @@ async def admin_load(message: Message, db: AsyncIOMotorDatabase):
     qa_count = await db["qa_history"].count_documents({})
     feedback_count = await db["feedback"].count_documents({})
     text = (
-        "<b>📊 Нагрузка системы:</b>\n"
-        f"Пользователей: <b>{users_count}</b>\n"
-        f"Курсов: <b>{courses_count}</b>\n"
-        f"Лекций: <b>{lectures_count}</b>\n"
-        f"Блоков: <b>{blocks_count}</b>\n"
-        f"Вопросов-ответов: <b>{qa_count}</b>\n"
-        f"Фидбэков: <b>{feedback_count}</b>\n"
+        "<b>📊 System Load:</b>\n"
+        f"Users: <b>{users_count}</b>\n"
+        f"Courses: <b>{courses_count}</b>\n"
+        f"Lectures: <b>{lectures_count}</b>\n"
+        f"Blocks: <b>{blocks_count}</b>\n"
+        f"Q&A: <b>{qa_count}</b>\n"
+        f"Feedbacks: <b>{feedback_count}</b>\n"
     )
+
     await message.answer(text, parse_mode="HTML")
   
 @router.callback_query(F.data.startswith("quiz_answer:"), LectureQuiz.answering)
@@ -859,9 +868,9 @@ async def show_quiz_result(message: Message, state: FSMContext, db: AsyncIOMotor
     if correct == total and total > 0:
         await db["users"].update_one(
             {"telegram_id": user_id},
-            {"$addToSet": {"badges": "Квиз-мастер"}}
+            {"$addToSet": {"badges": "Quiz Master"}}
         )
-        badge_text = "\n🏆 <b>Достижение: Квиз-мастер!</b>"
+        badge_text = "\n🏆 <b>Achievement: Quiz Master!</b>"
     else:
         badge_text = ""
 
@@ -869,12 +878,13 @@ async def show_quiz_result(message: Message, state: FSMContext, db: AsyncIOMotor
 
     # ...остальной код...
 
-    text = f"📝 <b>Квиз завершён!</b>\n\nПравильных ответов: <b>{correct} из {total}</b>\n"
-    text += f"🏅 Получено очков: <b>{points}</b>\n"
+    text = f"📝 <b>Quiz completed!</b>\n\nCorrect answers: <b>{correct} out of {total}</b>\n"
+    text += f"🏅 Points earned: <b>{points}</b>\n"
     if correct == total:
-        text += "🎉 Отлично! Все ответы верны!"
+        text += "🎉 Excellent! All answers are correct!"
     else:
-        text += "\nОшибки:\n"
+        text += "\nMistakes:\n"
+
         for idx, ans in enumerate(answers):
             if not ans["is_correct"]:
                 # --- Исправление: поддержка строковых ответов ("C") ---
@@ -892,10 +902,10 @@ async def show_quiz_result(message: Message, state: FSMContext, db: AsyncIOMotor
                 user_opt = chr(65 + user_choice_idx)
                 correct_opt = chr(65 + correct_choice_idx)
                 text += (
-                    f"\n<b>Вопрос {idx+1}:</b> {ans['question']}\n"
-                    f"Твой ответ: {user_opt}. {ans['options'][user_choice_idx]}\n"
-                    f"Правильный ответ: {correct_opt}. {ans['options'][correct_choice_idx]}\n"
-                    f"Пояснение: {ans['explanation']}\n"
+                    f"\n<b>Question {idx+1}:</b> {ans['question']}\n"
+                    f"Your answer: {user_opt}. {ans['options'][user_choice_idx]}\n"
+                    f"Correct answer: {correct_opt}. {ans['options'][correct_choice_idx]}\n"
+                    f"Explanation: {ans['explanation']}\n"
                 )
     text += badge_text
     await message.answer(text, parse_mode="HTML")
@@ -903,22 +913,22 @@ async def show_quiz_result(message: Message, state: FSMContext, db: AsyncIOMotor
 @router.message(Command("unblock_user"))
 async def unblock_user_start(message: Message, db: AsyncIOMotorDatabase):
     if not await is_admin(message.from_user.id, db):
-        await message.answer("❌ Только администраторы могут использовать эту команду.")
+        await message.answer("❌ Only administrators can use this command.")
         return
     users = await db["users"].find({"blocked": True}).to_list(length=100)
     if not users:
-        await message.answer("Нет заблокированных пользователей.")
+        await message.answer("There are no blocked users.")
         return
     builder = InlineKeyboardBuilder()
     for user in users:
-        name = user.get("name", "Без имени")
+        name = user.get("name", "Without a name")
         uid = user.get("telegram_id")
         builder.add(InlineKeyboardButton(
             text=f"{name} ({uid})",
             callback_data=f"unblock_user_select:{uid}"
         ))
     builder.adjust(1)
-    await message.answer("Выберите пользователя для разблокировки:", reply_markup=builder.as_markup())
+    await message.answer("Select the user to unlock:", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data.startswith("unblock_user_select:"))
 async def unblock_user_confirm(callback: CallbackQuery, db: AsyncIOMotorDatabase):
@@ -926,16 +936,16 @@ async def unblock_user_confirm(callback: CallbackQuery, db: AsyncIOMotorDatabase
     await db["users"].update_one({"telegram_id": user_id}, {"$set": {"blocked": False}})
     await log_admin_action(db, callback.from_user.id, "unblock_user", {"unblocked_id": user_id})
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer(f"Пользователь {user_id} успешно разблокирован.")
+    await callback.message.answer(f"The user {user_id} has been successfully unblocked.")
 
 # Отправь команду /get_id в группе, бот должен обработать её:
 @router.message(Command("get_id"))
 async def get_group_id(message: Message):
-    await message.answer(f"Chat ID этой группы: <code>{message.chat.id}</code>", parse_mode="HTML")
+    await message.answer(f"Chat ID this group: <code>{message.chat.id}</code>", parse_mode="HTML")
 
 @router.callback_query(F.data.startswith("select_course:"), FileUpload.waiting_for_course_choice)
 async def handle_course_selection(callback: CallbackQuery, state: FSMContext, bot: Bot, db: AsyncIOMotorDatabase):
-    await callback.message.edit_text("Отлично! Начинаю проверку и обработку файла... 🤖")
+    await callback.message.edit_text("Great! I'm starting to check and process the file...🤖")
     
     course_id = ObjectId(callback.data.split(":")[1])
     user_data = await state.get_data()
@@ -951,7 +961,7 @@ async def handle_course_selection(callback: CallbackQuery, state: FSMContext, bo
     file_hash = hashlib.sha256(file_in_memory.getvalue()).hexdigest()
     existing_lecture = await db["lectures"].find_one({"course_id": course_id, "file_hash": file_hash})
     if existing_lecture:
-        await callback.message.answer(f"⚠️ Этот файл уже был загружен для этого курса как '{existing_lecture['filename']}'. Обработка отменена.")
+        await callback.message.answer(f"⚠️ This file has already been uploaded for this course as '{existing_lecture['filename']}'. Processing cancelled.")
         return
 
     lecture_doc = await db["lectures"].insert_one({
@@ -974,12 +984,12 @@ async def handle_course_selection(callback: CallbackQuery, state: FSMContext, bo
             doc = Document(file_in_memory)
             text = "\n".join(para.text for para in doc.paragraphs)
     except Exception as e:
-        logging.error(f"Ошибка извлечения текста: {e}")
-        await callback.message.answer("❌ Ошибка при чтении файла.")
+        logging.error(f"Text extraction error: {e}")
+        await callback.message.answer("❌ Error when reading the file.")
         return
 
     if not text.strip():
-        await callback.message.answer("❌ Не удалось извлечь текст из файла.")
+        await callback.message.answer("❌ Couldn't extract text from the file.")
         return
 
     words = text.split()
@@ -991,16 +1001,17 @@ async def handle_course_selection(callback: CallbackQuery, state: FSMContext, bo
     total_seconds = num_chunks * DELAY_BETWEEN_REQUESTS_SEC
     
     if total_seconds < 60:
-        time_str = "меньше минуты"
+        time_str = "less than a minute"
     else:
         estimated_minutes = math.ceil(total_seconds / 60)
-        time_str = f"около {estimated_minutes} мин."
+        time_str = f"about {estimated_minutes} min."
 
     await callback.message.answer(
-        f"Файл разбит на {num_chunks} блоков. Начинаю генерацию квизов.\n"
-        f"⏳ <b>Примерное время обработки: {time_str}</b>\n\n"
-        f"Я сообщу, когда все будет готово. Можете пока заняться другими делами."
+        f"The file has been split into {num_chunks} blocks. Starting quiz generation.\n"
+        f"⏳ <b>Estimated processing time: {time_str}</b>\n\n"
+        f"I'll notify you when everything is ready. Meanwhile, you can take care of other tasks."
     )
+
 
     processed_blocks = 0
     last_notify_time = time.time()
@@ -1025,17 +1036,18 @@ async def handle_course_selection(callback: CallbackQuery, state: FSMContext, bo
                 await asyncio.sleep(30)
             if time.time() - last_notify_time > notify_interval:
                 await callback.message.answer(
-                    f"⏳ Обработка продолжается...\n"
-                    f"Готово {processed_blocks} из {num_chunks} блоков.\n"
-                    "Извините за задержку — возможно, превышен лимит запросов к ИИ. Пожалуйста, подождите ещё немного."
+                    f"⏳ Processing continues...\n"
+                    f"Completed {processed_blocks} out of {num_chunks} blocks.\n"
+                    "Sorry for the delay — the AI request limit may have been exceeded. Please wait a little longer."
                 )
+
                 last_notify_time = time.time()
         if i < num_chunks - 1:
             await asyncio.sleep(DELAY_BETWEEN_REQUESTS_SEC)
 
     # После обработки всех блоков — считаем реально созданные
     processed_blocks_db = await db["blocks"].count_documents({"lecture_id": lecture_id})
-    await callback.message.answer(f"✅ Готово! Создано {processed_blocks_db} учебных материалов для курса.")
+    await callback.message.answer(f"✅ Ready! {processed_blocks_db} training materials for the course have been created.")
     
 @router.message(AddCourse.waiting_for_title)
 async def add_course_title(message: Message, state: FSMContext, db: AsyncIOMotorDatabase):
@@ -1043,11 +1055,11 @@ async def add_course_title(message: Message, state: FSMContext, db: AsyncIOMotor
     # Проверяем, есть ли уже такой курс у пользователя
     existing = await db["courses"].find_one({"user_id": message.from_user.id, "title": title})
     if existing:
-        await message.answer("❌ Такой курс уже существует. Введите другое название.")
+        await message.answer("❌ Such a course already exists. Enter a different name.")
         return
     await state.update_data(title=title)
     await state.set_state(AddCourse.waiting_for_start_date)
-    await message.answer("Введите дату начала занятий в формате ДД.MM.ГГГГ (например, 08.09.2025). Дата должна быть в 2025 году.")
+    await message.answer("Enter the start date of classes in the format DD.MM.YYYY (for example, 09/08/2025). The date should be in 2025.")
 
 # ...existing code...
 
@@ -1055,24 +1067,24 @@ async def add_course_title(message: Message, state: FSMContext, db: AsyncIOMotor
 async def add_course_start_date(message: Message, state: FSMContext):
     start_dt = parse_date(message.text)
     if not start_dt:
-        await message.answer("❌ Неверный формат даты. Введите дату начала в формате ДД.MM.ГГГГ.")
+        await message.answer("❌ Incorrect date format. Enter the start date in the format DD.MM.YYYY.")
         return
     if start_dt.year != 2025:
-        await message.answer("❌ Дата начала занятий должна быть в 2025 году. Введите корректную дату.")
+        await message.answer("❌ The start date of classes should be in 2025. Enter the correct date.")
         return
     await state.update_data(start_date=start_dt)
     await state.set_state(AddCourse.waiting_for_exam_type)
 
     builder = InlineKeyboardBuilder()
     builder.add(
-        InlineKeyboardButton(text="Мидка (5 неделя)", callback_data="exam_type:мидка"),
-        InlineKeyboardButton(text="Эндка (10 неделя)", callback_data="exam_type:эндка"),
-        InlineKeyboardButton(text="Файнал (11-12 неделя)", callback_data="exam_type:файнал"),
+        InlineKeyboardButton(text="Midterm (Week 5)", callback_data="exam_type:midterm"),
+        InlineKeyboardButton(text="Endterm (Week 10)", callback_data="exam_type:endterm"),
+        InlineKeyboardButton(text="Final (Weeks 11-12)", callback_data="exam_type:final"),
     )
     builder.adjust(1)
     await message.answer(
-        "Дата начала сохранена. К какому экзамену ты готовишься?\n\n"
-        "Выбери тип экзамена:",
+        "The start date is saved. What exam are you studying for?\n\n"
+        "Choose the type of exam:",
         reply_markup=builder.as_markup()
     )
     
@@ -1084,14 +1096,15 @@ async def add_course_exam_type_callback(callback: CallbackQuery, state: FSMConte
     await state.update_data(exam_type=exam_type)
     await state.set_state(AddCourse.waiting_for_date)
     rec = {
-        "мидка": "Рекомендуется ~5 лекций, экзамен обычно на 5-й неделе.",
-        "эндка": "Рекомендуется ~5 лекций, экзамен обычно на 10-й неделе.",
-        "файнал": "Рекомендуется ~10 лекций (включая предыдущие), экзамен на 11-12 неделе."
+    "Midterm": "~5 lectures are recommended, the exam is usually in the 5th week.",
+    "Endterm": "~5 lectures are recommended, the exam is usually in the 10th week.",
+    "Final": "~10 lectures are recommended (including previous ones), the exam is in the 11th-12th week."
     }
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer(
-        f"Тип экзамена выбран: <b>{exam_type}</b>.\n{rec.get(exam_type, '')}\n\n"
-        "Теперь введите дату экзамена в формате ДД.MM.ГГГГ (в 2025 году).",
+        f"Exam type selected: <b>{exam_type}</b>.\n{rec.get(exam_type, '')}\n\n"
+        "Now enter the exam date in the format DD.MM.YYYY (in 2025).",
+
         parse_mode="HTML"
     )
 # ...existing code...
@@ -1101,11 +1114,11 @@ async def block_learned_callback(callback: CallbackQuery, db: AsyncIOMotorDataba
     block_id = ObjectId(callback.data.split(":")[1])
     block = await db["blocks"].find_one({"_id": block_id})
     if not block:
-        await callback.answer("Блок не найден.", show_alert=True)
+        await callback.answer("The block was not found.", show_alert=True)
         return
     await db["blocks"].update_one({"_id": block_id}, {"$set": {"learned_at": now_utc()}})
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer("✅ Блок отмечен как изученный!")
+    await callback.message.answer("✅ The block is marked as studied!")
 
     # --- Проверяем, все ли блоки лекции изучены ---
     lecture_id = block.get("lecture_id")
@@ -1115,20 +1128,20 @@ async def block_learned_callback(callback: CallbackQuery, db: AsyncIOMotorDataba
     if total_blocks > 0 and total_blocks == learned_blocks:
         # Все блоки лекции изучены — предлагаем пройти квиз
         keyboard = InlineKeyboardBuilder()
-        keyboard.add(InlineKeyboardButton(text="📝 Пройти квиз по лекции", callback_data=f"start_quiz:{lecture_id}"))
+        keyboard.add(InlineKeyboardButton(text="📝 Take a quiz on the lecture", callback_data=f"start_quiz:{lecture_id}"))
         await callback.message.answer(
-            "🎉 Ты изучил все блоки этой лекции!\nГотов проверить себя?",
+            "🎉 You have studied all the blocks of this lecture!\nAre you ready to test yourself?",
             reply_markup=keyboard.as_markup()
         )
 
 @router.message(Command("delete_course"))
 async def delete_course(message: Message, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     user_courses = await db["courses"].find({"user_id": message.from_user.id}).to_list(length=10)
     if not user_courses:
-        await message.answer("У вас нет добавленных курсов.")
+        await message.answer("You don't have any courses added.")
         return
 
     builder = InlineKeyboardBuilder()
@@ -1138,17 +1151,17 @@ async def delete_course(message: Message, db: AsyncIOMotorDatabase):
             callback_data=f"delete_course:{course['_id']}"
         ))
     builder.adjust(1)
-    await message.answer("Выберите курс для удаления:", reply_markup=builder.as_markup())
+    await message.answer("Select the course to delete:", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data.startswith("show_files:"))
 async def show_files_for_course(callback: CallbackQuery, db: AsyncIOMotorDatabase):
     if await is_blocked(callback.from_user.id, db):
-        await callback.message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await callback.answer("❌ Your account has been blocked by the administrator.")
         return
     course_id = ObjectId(callback.data.split(":")[1])
     lectures = await db["lectures"].find({"course_id": course_id}).to_list(length=20)
     if not lectures:
-        await callback.message.answer("Для этого курса нет загруженных файлов.")
+        await callback.message.answer("There are no uploaded files for this course.")
         return
 
     builder = InlineKeyboardBuilder()
@@ -1158,23 +1171,23 @@ async def show_files_for_course(callback: CallbackQuery, db: AsyncIOMotorDatabas
             callback_data=f"send_file:{lec['_id']}"
         ))
     builder.adjust(1)
-    await callback.message.answer("Выберите файл для скачивания:", reply_markup=builder.as_markup())
+    await callback.message.answer("Select the file to download:", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data.startswith("send_file:"))
 async def send_file_to_user(callback: CallbackQuery, bot: Bot, db: AsyncIOMotorDatabase):
     if await is_blocked(callback.from_user.id, db):
-        await callback.message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await callback.answer("❌ Your account has been blocked by the administrator.")
         return
     file_id = ObjectId(callback.data.split(":")[1])
     lecture = await db["lectures"].find_one({"_id": file_id})
     if not lecture:
-        await callback.message.answer("Файл не найден.")
+        await callback.message.answer("The file was not found.")
         return
 
     # Получаем file_id Telegram (вы должны сохранять его при загрузке)
     tg_file_id = lecture.get("tg_file_id")
     if not tg_file_id:
-        await callback.message.answer("Файл не может быть отправлен (нет file_id Telegram).")
+        await callback.message.answer("The file cannot be sent (there is no Telegram file_id).")
         return
 
     await bot.send_document(chat_id=callback.from_user.id, document=tg_file_id, caption=lecture['filename'])
@@ -1182,19 +1195,19 @@ async def send_file_to_user(callback: CallbackQuery, bot: Bot, db: AsyncIOMotorD
 @router.callback_query(F.data.startswith("delete_course:"))
 async def confirm_delete_course(callback: CallbackQuery, db: AsyncIOMotorDatabase):
     if await is_blocked(callback.from_user.id, db):
-        await callback.message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await callback.answer("❌ Your account has been blocked by the administrator.")
         return
     course_id = ObjectId(callback.data.split(":")[1])
     course = await db["courses"].find_one({"_id": course_id})
     if not course:
-        await callback.message.answer("Курс не найден.")
+        await callback.message.answer("The course was not found.")
         return
     builder = InlineKeyboardBuilder()
     builder.add(
-        InlineKeyboardButton(text="Да, удалить", callback_data=f"confirm_delete_course:{course_id}"),
-        InlineKeyboardButton(text="Нет", callback_data="cancel_delete")
+        InlineKeyboardButton(text="Yes, delete it", callback_data=f"confirm_delete_course:{course_id}"),
+        InlineKeyboardButton(text="No", callback_data="cancel_delete")
     )
-    await callback.message.answer(f"Вы уверены, что хотите удалить курс «{course['title']}»?", reply_markup=builder.as_markup())
+    await callback.message.answer(f"Are you sure you want to delete the course «{course['title']}»?", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data.startswith("confirm_delete_course:"))
 async def really_delete_course(callback: CallbackQuery, db: AsyncIOMotorDatabase):
@@ -1204,12 +1217,12 @@ async def really_delete_course(callback: CallbackQuery, db: AsyncIOMotorDatabase
     await db["lectures"].delete_many({"course_id": course_id})
     await db["blocks"].delete_many({"course_id": course_id})
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer(f"Курс «{course['title']}» и все связанные материалы удалены.")
+    await callback.message.answer(f"The course «{course['title']}» and all related materials have been deleted.")
 
 @router.callback_query(F.data == "cancel_delete")
 async def cancel_delete(callback: CallbackQuery):
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer("Удаление отменено.")
+    await callback.message.answer("Deletion has been canceled.")
 # --- Хендлер для /start ---
 @router.message(CommandStart())
 async def start(message: Message, db: AsyncIOMotorDatabase):
@@ -1222,13 +1235,14 @@ async def start(message: Message, db: AsyncIOMotorDatabase):
         upsert=True
     )
     await message.answer(
-        f"Привет, {user_name}!\nЯ твой интеллектуальный помощник для учебы.\n\n"
-        "<b>С чего начать:</b>\n"
-        "1. Добавь курс с помощью /add_course.\n"
-        "2. Загрузи файл с лекцией (.pdf или .docx).\n"
-        "3. Выбери удобный период суток для получения учебных сообщений.\n\n"
-        "ℹ️ Для подробной справки по всем командам напиши /help."
+        f"Hi, {user_name}!\nI'm your intelligent study assistant.\n\n"
+        "<b>How to get started:</b>\n"
+        "1. Add a course using /add_course.\n"
+        "2. Upload a lecture file (.pdf or .docx).\n"
+        "3. Choose a convenient time of day to receive study messages.\n\n"
+        "ℹ️ For detailed help on all commands, type /help."
     )
+
 
 
 
@@ -1332,42 +1346,42 @@ def compute_send_schedule(
 @router.message(Command("preview_schedule"))
 async def preview_schedule_start(message: Message, db: AsyncIOMotorDatabase):
     if await is_blocked(message.from_user.id, db):
-        await message.answer("❌ Ваш аккаунт заблокирован администратором.")
+        await message.answer("❌ Your account has been blocked by the administrator.")
         return
     user_courses = await db["courses"].find({"user_id": message.from_user.id}).to_list(length=20)
     if not user_courses:
-        await message.answer("У вас нет добавленных курсов.")
+        await message.answer("You don't have any courses added.")
         return
     builder = InlineKeyboardBuilder()
     for course in user_courses:
         builder.add(InlineKeyboardButton(text=course['title'], callback_data=f"preview_schedule:{course['_id']}"))
     builder.adjust(1)
-    await message.answer("Выберите курс для предпросмотра расписания отправки блоков:", reply_markup=builder.as_markup())
+    await message.answer("Select a course to preview the block dispatch schedule:", reply_markup=builder.as_markup())
 
 @router.callback_query(F.data.startswith("preview_schedule:"))
 async def preview_schedule_callback(callback: CallbackQuery, db: AsyncIOMotorDatabase):
     course_id = ObjectId(callback.data.split(":")[1])
     course = await db["courses"].find_one({"_id": course_id})
     if not course:
-        await callback.message.answer("Курс не найден.")
+        await callback.message.answer("The course was not found.")
         return
 
     # подсчитать количество неотправленных блоков
     blocks_left = await db["blocks"].count_documents({"course_id": course_id, "sent_at": {"$exists": False}})
     if blocks_left == 0:
-        await callback.message.answer("Нет незапланированных/неотправленных блоков для этого курса.")
+        await callback.message.answer("There are no unplanned/unsent blocks for this course.")
         return
 
     start_dt = course.get("start_date")
     exam_dt = course.get("exam_date")
-    period = course.get("notification_period", "день")
+    period = course.get("notification_period", "day")
     now = now_local()
 
     # если даты в БД хранятся как naive, сделаем aware
     start_dt = ensure_aware(start_dt) if start_dt else None
     exam_dt = ensure_aware(exam_dt) if exam_dt else None
     if not start_dt or not exam_dt:
-        await callback.message.answer("У курса не заполнены даты (start_date/exam_date).")
+        await callback.message.answer("The course dates are not filled in (start_date/exam_date).")
         return
 
     schedule = compute_send_schedule(start_dt, exam_dt, now, period, blocks_left)
@@ -1377,10 +1391,10 @@ async def preview_schedule_callback(callback: CallbackQuery, db: AsyncIOMotorDat
 
     # покажем первые 50 элементов, если много
     text = (
-        f"Курс: {course.get('title')}\n"
-        f"Незагруженных блоков: {blocks_left}\n"
-        f"Период уведомлений: {period}\n\n"
-        "Расписание отправки (пример):\n" + ("\n".join(human_lines[:50]))
+        f"Course: {course.get('title')}\n"
+        f"Unuploaded blocks: {blocks_left}\n"
+        f"Notification period: {period}\n\n"
+        "Delivery schedule (example):\n" + ("\n".join(human_lines[:50]))
     )
     await callback.message.edit_reply_markup(reply_markup=None)
     await callback.message.answer(text)
@@ -1406,18 +1420,18 @@ async def send_next_blocks(course_id: ObjectId, bot: Bot, db: AsyncIOMotorDataba
     sent = 0
     for block in blocks:
         course = await db["courses"].find_one({"_id": course_id})
-        title = course.get("title", "Курс")
-        summary = block.get("summary", "Нет краткого содержания.")
-        explanation = block.get("explanation", "Нет объяснения.")
+        title = course.get("title", "Course")
+        summary = block.get("summary", "There is no summary.")
+        explanation = block.get("explanation", "There is no explanation.")
         text_to_send = (
-            f"🔔 <b>Новый материал для изучения!</b>\n\n"
-            f"📚 <b>Курс:</b> «{title}»\n\n"
-            f"<b>Краткое содержание:</b>\n{summary}\n\n"
-            f"<b>Простыми словами:</b>\n{explanation}"
+            f"🔔 <b>New material to study!</b>\n\n"
+            f"📚 <b>Course:</b> «{title}»\n\n"
+            f"<b>Brief content:</b>\n{summary}\n\n"
+            f"<b>In simple words:</b>\n{explanation}"
         )
         keyboard = types.InlineKeyboardMarkup(
             inline_keyboard=[
-                [types.InlineKeyboardButton(text="✅ Я изучил", callback_data=f"block_learned:{block['_id']}")]
+                [types.InlineKeyboardButton(text="✅ I've studied", callback_data=f"block_learned:{block['_id']}")]
             ]
         )
         try:
@@ -1425,7 +1439,7 @@ async def send_next_blocks(course_id: ObjectId, bot: Bot, db: AsyncIOMotorDataba
             await db["blocks"].update_one({"_id": block["_id"]}, {"$set": {"sent_at": now_utc()}})
             sent += 1
         except Exception as e:
-            logging.error(f"Не удалось отправить блок {block['_id']} пользователю {user_id}: {e}")
+            logging.error(f"Couldn't send the block {block['_id']} to the user {user_id}: {e}")
     return sent
 
 @router.callback_query(F.data.startswith("simulate_send:"))
@@ -1433,18 +1447,18 @@ async def simulate_send_callback(callback: CallbackQuery, bot: Bot, db: AsyncIOM
     course_id = ObjectId(callback.data.split(":")[1])
     course = await db["courses"].find_one({"_id": course_id})
     if not course:
-        await callback.message.answer("Курс не найден.")
+        await callback.message.answer("The course was not found.")
         return
     exam_dt = ensure_aware(course.get("exam_date"))
     now = now_local()
     blocks_left = await db["blocks"].count_documents({"course_id": course_id, "user_id": callback.from_user.id, "sent_at": {"$exists": False}})
     if blocks_left == 0:
-        await callback.message.answer("Нет неотправленных блоков для этого курса.")
+        await callback.message.answer("There are no unsent blocks for this course.")
         return
     to_send = compute_blocks_to_send_now(exam_dt, now, blocks_left)
     sent = await send_next_blocks(course_id, bot, db, to_send, callback.from_user.id)
     await callback.message.edit_reply_markup(reply_markup=None)
-    await callback.message.answer(f"Симуляция: отправлено {sent} блока(ов) для курса «{course.get('title')}».")
+    await callback.message.answer(f"Simulation: sent {sent} the block(s) for the course «{course.get('title')}».")
 # ...existing code...
 
 
@@ -1465,7 +1479,7 @@ async def start_lecture_quiz(callback: CallbackQuery, state: FSMContext, db: Asy
                 "explanation": q.get("explanation", "")
             })
     if not questions:
-        await callback.message.answer("Нет вопросов для квиза по этой лекции.")
+        await callback.message.answer("There are no questions for the quiz on this lecture.")
         return
     await state.update_data(
         quiz_questions=questions,
@@ -1493,7 +1507,7 @@ async def send_next_quiz_question(message: Message, state: FSMContext, db: Async
         ))
     builder.adjust(1)
     await message.answer(
-        f"<b>Вопрос {idx+1} из {len(questions)}:</b>\n{q['question']}",
+        f"<b>Question {idx+1} from {len(questions)}:</b>\n{q['question']}",
         reply_markup=builder.as_markup(),
         parse_mode="HTML"
     )
